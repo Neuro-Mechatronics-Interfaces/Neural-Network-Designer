@@ -1,0 +1,253 @@
+// app/tikz-export.js — generate LaTeX/TikZ code for the network schematic.
+// Paste-ready into a .tex document using `\usetikzlibrary{positioning, arrows.meta, shapes.geometric, fit}`.
+
+(function () {
+  // Strip-and-escape for plain TeX text (layer/group labels). Aggressive
+  // because the user can type any character; we never expect math glyphs here.
+  const ESC = (s) => String(s ?? "")
+    .replace(/\\/g, "\\textbackslash{}")
+    .replace(/&/g, "\\&")
+    .replace(/%/g, "\\%")
+    .replace(/#/g, "\\#")
+    .replace(/_/g, "\\_")
+    .replace(/\^/g, "\\^{}")
+    .replace(/\{/g, "\\{").replace(/\}/g, "\\}");
+
+  // Translate Unicode math glyphs to LaTeX commands. Sub-labels (layer
+  // annotation, edge annotation, free text annotation) are treated as math
+  // input — we run them through this before wrapping in $...$ so users can
+  // type things like “x_t ∈ ℝ^{32}” and get proper rendering. LaTeX math
+  // commands the user already typed (e.g. \hat{x}, _{t+1}) are preserved.
+  function mathify(text) {
+    if (text === undefined || text === null) return "";
+    let s = String(text);
+    // Combining circumflex (U+0302) after any char → \hat{char}.  Handles
+    // x̂, ŷ, Â etc. (NB: “x̂” in JS is two code points.)
+    s = s.replace(/(\S)\u0302/g, "\\hat{$1}");
+    s = s.replace(/(\S)\u0303/g, "\\tilde{$1}");   // combining tilde
+    s = s.replace(/(\S)\u0304/g, "\\bar{$1}");     // combining macron
+    const map = {
+      "ℝ":"\\mathbb{R}", "ℕ":"\\mathbb{N}", "ℤ":"\\mathbb{Z}", "ℚ":"\\mathbb{Q}", "ℂ":"\\mathbb{C}",
+      "∈":"\\in", "∉":"\\notin", "∋":"\\ni",
+      "⊕":"\\oplus", "⊗":"\\otimes", "⊙":"\\odot",
+      "⊆":"\\subseteq", "⊂":"\\subset", "⊇":"\\supseteq", "⊃":"\\supset",
+      "α":"\\alpha", "β":"\\beta", "γ":"\\gamma", "δ":"\\delta",
+      "ε":"\\varepsilon", "ζ":"\\zeta", "η":"\\eta", "θ":"\\theta",
+      "λ":"\\lambda", "μ":"\\mu", "π":"\\pi", "ρ":"\\rho",
+      "σ":"\\sigma", "τ":"\\tau", "φ":"\\varphi", "ψ":"\\psi", "ω":"\\omega",
+      "Γ":"\\Gamma", "Δ":"\\Delta", "Θ":"\\Theta", "Λ":"\\Lambda",
+      "Π":"\\Pi", "Σ":"\\Sigma", "Φ":"\\Phi", "Ψ":"\\Psi", "Ω":"\\Omega",
+      "→":"\\to", "←":"\\leftarrow", "↔":"\\leftrightarrow",
+      "⇒":"\\Rightarrow", "⇐":"\\Leftarrow",
+      "×":"\\times", "·":"\\cdot", "−":"-", "–":"--", "—":"---",
+      "…":"\\ldots", "≤":"\\le", "≥":"\\ge", "≠":"\\ne", "≈":"\\approx",
+      "∞":"\\infty", "∂":"\\partial", "∇":"\\nabla",
+      "∑":"\\sum", "∏":"\\prod", "∫":"\\int",
+      "₀":"_0","₁":"_1","₂":"_2","₃":"_3","₄":"_4","₅":"_5","₆":"_6","₇":"_7","₈":"_8","₉":"_9",
+      "₊":"_+","₋":"_-","ₜ":"_t","ₕ":"_h","ₓ":"_x","ₙ":"_n","ₖ":"_k","ᵢ":"_i",
+      "⁰":"^0","¹":"^1","²":"^2","³":"^3","⁴":"^4","⁵":"^5","⁶":"^6","⁷":"^7","⁸":"^8","⁹":"^9",
+      "ᵀ":"^T",
+    };
+    for (const k of Object.keys(map)) s = s.split(k).join(map[k]);
+    return s;
+  }
+
+  // Wrap user math in $...$ if non-empty.
+  const M = (text) => {
+    const m = mathify(text);
+    if (!m || !m.trim()) return "";
+    return "$" + m + "$";
+  };
+
+  const NEURON_FILL = {
+    sigmoid:    "nndSigmoid",
+    tanh:       "nndTanh",
+    relu:       "nndRelu",
+    gated:      "nndGated",
+    "lstm-cell":"nndLstm",
+    "gru-cell": "nndGru",
+    linear:     "nndLinear",
+    concat:     "nndConcat",
+  };
+
+  // \definecolor lines emitted once at the top of the picture so we can
+  // reference the swatches above by name in every \node[fill=...] below.
+  // xcolor's `{HTML}{RRGGBB}` syntax is only valid inside \definecolor, not
+  // as an inline `fill=` argument — hence this indirection.
+  const COLOR_DEFINITIONS = [
+    "  \\definecolor{nndSigmoid}{HTML}{FBBF24}",
+    "  \\definecolor{nndTanh}{HTML}{F59E0B}",
+    "  \\definecolor{nndRelu}{HTML}{3B82F6}",
+    "  \\definecolor{nndGated}{HTML}{8B5CF6}",
+    "  \\definecolor{nndLstm}{HTML}{EC4899}",
+    "  \\definecolor{nndGru}{HTML}{06B6D4}",
+    "  \\definecolor{nndLinear}{HTML}{6B7280}",
+    "  \\definecolor{nndConcat}{HTML}{4B5563}",
+  ].join("\n");
+
+  const NEURON_SYMBOL = {
+    sigmoid: "$\\sigma$",
+    tanh:    "$\\varphi$",
+    relu:    "R",
+    gated:   "$\\otimes$",
+    "lstm-cell": "L",
+    "gru-cell":  "G",
+    linear:  "",
+    concat:  "$\\oplus$",
+  };
+
+  // Generates a complete, self-contained TikZ picture (no surrounding document).
+  function generateTikZ(state) {
+    const layers      = state.layers || [];
+    const connections = state.connections || [];
+    const groups      = state.groups || [];
+    const figure      = Object.assign({}, window.DEFAULT_FIGURE, state.figure || {});
+    if (!layers.length) {
+      return "% Network has no layers — nothing to export.\n";
+    }
+
+    // Compute layout in cm. We map SVG px → cm by dividing by 40 (≈ 1 cm per 40 px).
+    const PX_TO_CM = 1 / 40;
+    const minX = Math.min(...layers.map((l) => l.position.x));
+    const minY = Math.min(...layers.map((l) => l.position.y));
+
+    let out = "";
+    out += "% Neural network architecture — generated by Neural Network Designer.\n";
+    out += "% Requires: \\usepackage{tikz,xcolor,graphicx}\n";
+    out += "%           \\usetikzlibrary{positioning,arrows.meta,shapes.geometric,fit,backgrounds}\n";
+    out += COLOR_DEFINITIONS + "\n";
+    // \resizebox auto-fits the picture to \linewidth so wide architectures
+    // don't overflow the page. Drop this wrapper if you want native size.
+    out += "\\resizebox{\\linewidth}{!}{%\n";
+    out += "\\begin{tikzpicture}[\n";
+    out += "    layer/.style    = {draw=black, line width=0.6pt, fill=white, minimum width=1.7cm, minimum height=2.8cm, inner sep=4pt},\n";
+    out += "    neuron/.style   = {circle, draw=black, line width=0.6pt, minimum size=8mm, inner sep=0pt, font=\\bfseries\\color{white}},\n";
+    out += "    fwd/.style      = {-Latex, line width=0.5pt, draw=black!75},\n";
+    out += "    rec/.style      = {-Latex, line width=0.6pt, draw=red!75},\n";
+    out += "    skip/.style     = {-Latex, line width=0.5pt, draw=black!75, dashed},\n";
+    out += "    group/.style    = {draw, dashed, line width=0.5pt, rounded corners=4pt, inner sep=10pt, inner ysep=18pt},\n";
+    out += "    glabel/.style   = {font=\\scshape\\small, anchor=south west, inner sep=2pt, fill=white},\n";
+    out += "    caption/.style  = {font=\\scriptsize\\color{black!65}, align=center},\n";
+    out += "    layername/.style= {font=\\small\\bfseries, anchor=south, inner sep=2pt},\n";
+    out += "]\n";
+
+    // Layer nodes ---------------------------------------------------------
+    for (const l of layers) {
+      const x = ((l.position.x - minX) * PX_TO_CM).toFixed(2);
+      const y = (-(l.position.y - minY) * PX_TO_CM).toFixed(2); // flip Y for TikZ
+      out += `  \\node[layer] (${nodeId(l)}) at (${x},${y}) {};\n`;
+      // Neuron column inside the box — centred around .center so the stack
+      // stays inside the box edges. visible neurons share spacing of 0.7cm.
+      const visible = l.type === "concat" ? 1 : Math.min(l.units, 4);
+      const fill = NEURON_FILL[l.neuronType] || NEURON_FILL.linear;
+      const sym  = NEURON_SYMBOL[l.neuronType] || "";
+      for (let i = 0; i < visible; i++) {
+        const yshift = (((visible - 1) / 2) - i) * 0.7;
+        if (i === 3 && l.units > 4) {
+          out += `  \\node[font=\\Large] at ([yshift=${yshift.toFixed(2)}cm]${nodeId(l)}.center) {$\\vdots$};\n`;
+          continue;
+        }
+        out += `  \\node[neuron, fill=${fill}] at ([yshift=${yshift.toFixed(2)}cm]${nodeId(l)}.center) {${sym}};\n`;
+      }
+      // Layer name floating just above the box top.
+      out += `  \\node[layername, yshift=2pt] at (${nodeId(l)}.north) {${ESC(l.name)}};\n`;
+      // Caption below box — given a name so groups can fit-include it.
+      if (figure.showLayerCaptions) {
+        const caption = captionFor(l);
+        if (caption) out += `  \\node[caption, below=2pt of ${nodeId(l)}.south] (cap${nodeId(l)}) {${caption}};\n`;
+      }
+    }
+
+    // Groups --------------------------------------------------------------
+    if (figure.showGroupOutline) {
+      for (const g of groups) {
+        const ids = g.layerIds.map((id) => layers.find((l) => l.id === id)).filter(Boolean);
+        if (!ids.length) continue;
+        // Fit includes both the layer box AND its caption node so the group
+        // outline grows down to cover the sub-labels.
+        const fitTargets = [];
+        for (const l of ids) {
+          fitTargets.push(nodeId(l));
+          if (figure.showLayerCaptions && captionFor(l)) fitTargets.push("cap" + nodeId(l));
+        }
+        const tag = "g" + (g.id || "").replace(/[^a-z0-9]/gi, "");
+        const hasRec = (connections || []).some((c) => c.fromLayerId === c.toLayerId && c.type === "recurrent" && ids.some((l) => l.id === c.fromLayerId));
+        // Bump label above any recurrent arc that fights for the same space.
+        const labelShift = hasRec ? 18 : 4;
+        out += `  \\begin{scope}[on background layer]\n`;
+        out += `    \\node[group, fit=(${fitTargets.join(") (")})] (${tag}) {};\n`;
+        out += `    \\node[glabel, above=${labelShift}pt of ${tag}.north west, anchor=south west] {${ESC(g.label || "Group")}};\n`;
+        out += `  \\end{scope}\n`;
+      }
+    }
+
+    // Connections ---------------------------------------------------------
+    // Edge labels are positioned by connection type to avoid collisions:
+    //   skip       — pos=0.88 (close to destination so it doesn't pile up over intermediate boxes)
+    //   forward    — pos=0.5  (midway)
+    //   recurrent  — inside the arc, smaller, with extra white-fill padding
+    for (const c of connections) {
+      const from = layers.find((l) => l.id === c.fromLayerId);
+      const to   = layers.find((l) => l.id === c.toLayerId);
+      if (!from || !to) continue;
+      const style = c.type === "recurrent" ? "rec" : (c.type === "skip" ? "skip" : "fwd");
+      const labelMath = M(c.annotation);
+      if (from.id === to.id) {
+        // Symmetric self-loop above the box, modest height so it stays clear
+        // of the group label tab.
+        const labelArg = labelMath ? `node[pos=0.5, font=\\tiny, fill=white, inner sep=1pt, yshift=1pt] {${labelMath}} ` : "";
+        out += `  \\draw[${style}] (${nodeId(from)}.north west) to[bend left=45] ${labelArg}(${nodeId(from)}.north east);\n`;
+        continue;
+      }
+      const dx = to.position.x - from.position.x;
+      const dy = to.position.y - from.position.y;
+      // Use a smooth curve if the edge isn't (nearly) horizontal.  Lets wrapped
+      // multi-row layouts route cleanly from the right of one row down to the
+      // left of the next.
+      const horizontal = Math.abs(dy) < 8;
+      const pathOp = horizontal ? "--" : "to[out=0, in=180]";
+      let labelArg = "";
+      if (labelMath) {
+        const pos = c.type === "skip" ? 0.88 : 0.5;
+        labelArg = `node[pos=${pos}, sloped, above, font=\\scriptsize, fill=white, inner sep=1pt] {${labelMath}} `;
+      }
+      out += `  \\draw[${style}] (${nodeId(from)}.east) ${pathOp} ${labelArg}(${nodeId(to)}.west);\n`;
+    }
+
+    out += "\\end{tikzpicture}%\n";
+    out += "}\n";   // close \resizebox
+    return out;
+  }
+
+  function nodeId(layer) { return "n" + String(layer.id).replace(/[^a-z0-9]/gi, ""); }
+
+  function captionFor(l) {
+    const parts = [];
+    if (l.type === "concat") {
+      parts.push("$" + l.units + "\\text{-dim}$");
+    } else {
+      parts.push(l.units + " units");
+      if (l.activation && l.activation !== "Linear") parts[parts.length - 1] += " \\\\ " + ESC(l.activation);
+      if (l.dropout && l.dropout > 0) {
+        parts[parts.length - 1] += (l.activation && l.activation !== "Linear" ? " $\\cdot$ " : " \\\\ ") + "$p=" + l.dropout.toFixed(2) + "$";
+      }
+    }
+    if (l.annotation && String(l.annotation).trim().length > 0) {
+      parts.push("\\itshape " + M(l.annotation));
+    }
+    return parts.join(" \\\\ ");
+  }
+
+  function downloadTeX(state) {
+    const tex = generateTikZ(state);
+    const blob = new Blob([tex], { type: "text/x-tex;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = (window.publicationExport.filenameFrom(state.figure) || "neural-network") + ".tex";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return true;
+  }
+
+  window.tikzExport = { generate: generateTikZ, download: downloadTeX };
+})();

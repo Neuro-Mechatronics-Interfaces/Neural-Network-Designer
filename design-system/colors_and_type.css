@@ -1,0 +1,320 @@
+/* ============================================================
+   Neural Network Designer — colors_and_type.css
+   Single source of truth for color + type tokens.
+   Mirrors the tokens defined in src/styles/theme.css from the
+   product, then layers semantic + brand-specific tokens on top.
+   ============================================================ */
+
+/* Brand UI face: Untitled Sans (Klim Type Foundry).
+   Currently only Light (300) is provided — Inter is loaded as fallback
+   for the weights we don't have (400/500/600/700).
+   STIX Two Math is loaded for mathematical glyphs in the schematic. */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=STIX+Two+Math&display=swap");
+
+@font-face {
+  font-family: "Untitled Sans";
+  src: url("fonts/untitled-sans-light.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* ---------- Base font ---------- */
+  --font-size: 16px;
+  /* Untitled Sans (300) is the brand face; Inter is the fallback for the
+     weights we don't have yet (400+). */
+  --font-family-ui: "Untitled Sans", "Inter", -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-family-math: "STIX Two Math", "Cambria Math", "Latin Modern Math",
+    serif;
+  --font-family-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  --font-weight-light: 300;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* ---------- Chrome neutrals (from theme.css) ---------- */
+  --background: #ffffff;
+  --foreground: oklch(0.145 0 0);          /* near-black body text */
+  --card: #ffffff;
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+
+  --primary: #030213;                       /* near-black primary */
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.95 0.0058 264.53);
+  --secondary-foreground: #030213;
+
+  --muted: #ececf0;
+  --muted-foreground: #717182;
+  --accent: #e9ebef;
+  --accent-foreground: #030213;
+  --destructive: #d4183d;
+  --destructive-foreground: #ffffff;
+
+  --border: rgba(0, 0, 0, 0.1);
+  --input: transparent;
+  --input-background: #f3f3f5;
+  --switch-background: #cbced4;
+  --ring: oklch(0.708 0 0);
+
+  /* Page wash visible behind the AppBar */
+  --page-wash: #fafafa;
+  --canvas-bg: #ffffff;
+  --canvas-hover-bg: #eff6ff; /* drop target */
+
+  /* Semantic foregrounds */
+  --fg-1: oklch(0.145 0 0);   /* body / titles */
+  --fg-2: #4b5563;             /* secondary text */
+  --fg-3: #717182;             /* muted / helper text */
+  --fg-4: #9ca3af;             /* placeholder / disabled */
+  --fg-inverse: #ffffff;
+
+  /* ---------- Selection / interaction blue (MUI primary) ---------- */
+  --selection: #3b82f6;        /* canvas selection ring */
+  --selection-dark: #1d4ed8;
+  --primary-blue: #1976d2;     /* MUI default primary used by AppBar */
+
+  /* ---------- Neuron palette (schematic-only) ---------- */
+  --neuron-sigmoid: #fbbf24;
+  --neuron-tanh: #f59e0b;
+  --neuron-relu: #3b82f6;
+  --neuron-gated: #8b5cf6;
+  --neuron-lstm: #ec4899;
+  --neuron-gru: #06b6d4;
+  --neuron-linear: #6b7280;
+
+  /* Connection colors */
+  --connection-forward: #9ca3af;
+  --connection-recurrent: #ef4444;
+  --connection-skip: #9ca3af;
+
+  /* ---------- Layer-type accent (light tints for sidebar chips) ---------- */
+  --layer-input-bg: #dbeafe;
+  --layer-output-bg: #fce7f3;
+  --layer-mlp-bg: #e0e7ff;
+  --layer-rnn-bg: #fef3c7;
+  --layer-lstm-bg: #fce7f3;
+  --layer-gru-bg: #cffafe;
+  --layer-cnn-bg: #ede9fe;
+  --layer-transformer-bg: #ddd6fe;
+
+  /* ---------- Chart palette (analytics, if used) ---------- */
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+
+  /* ---------- Sidebars ---------- */
+  --sidebar-left-bg: #fafafa;
+  --sidebar-right-bg: #ffffff;
+  --sidebar-border: rgba(0, 0, 0, 0.08);
+
+  /* ---------- Radii ---------- */
+  --radius: 0.625rem;                         /* 10px — default */
+  --radius-sm: calc(var(--radius) - 4px);     /* 6px */
+  --radius-md: calc(var(--radius) - 2px);     /* 8px */
+  --radius-lg: var(--radius);                 /* 10px */
+  --radius-xl: calc(var(--radius) + 4px);     /* 14px */
+  --radius-full: 9999px;
+  --radius-canvas-layer: 0;                   /* publication: square */
+  --radius-group-outline: 10px;               /* dashed group rounded */
+
+  /* ---------- Spacing scale (4px base) ---------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ---------- Pane sizes ---------- */
+  --pane-left: 256px;     /* w-64 — layer templates */
+  --pane-right: 384px;    /* w-96 — inspector */
+  --appbar-height: 64px;
+
+  /* ---------- Shadows (MUI elevation cheatsheet) ---------- */
+  --shadow-1: 0 2px 1px -1px rgba(0,0,0,0.2),
+              0 1px 1px 0 rgba(0,0,0,0.14),
+              0 1px 3px 0 rgba(0,0,0,0.12);
+  --shadow-2: 0 3px 1px -2px rgba(0,0,0,0.2),
+              0 2px 2px 0 rgba(0,0,0,0.14),
+              0 1px 5px 0 rgba(0,0,0,0.12);
+  --shadow-3: 0 3px 3px -2px rgba(0,0,0,0.2),
+              0 3px 4px 0 rgba(0,0,0,0.14),
+              0 1px 8px 0 rgba(0,0,0,0.12);
+  --shadow-dialog: 0 11px 15px -7px rgba(0,0,0,0.2),
+                   0 24px 38px 3px rgba(0,0,0,0.14),
+                   0 9px 46px 8px rgba(0,0,0,0.12);
+
+  /* ---------- Schematic primitives ---------- */
+  --neuron-radius: 18px;
+  --neuron-spacing: 60px;
+  --layer-box-width: 80px;
+  --layer-stroke: 2px;
+  --layer-stroke-selected: 3px;
+  --layer-group-dash: 5 5;
+  --connection-stroke: 2px;
+  --arrow-size: 10px;
+
+  /* ---------- Motion ---------- */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --duration-1: 100ms;
+  --duration-2: 150ms;
+  --duration-3: 200ms;
+  --duration-4: 250ms;
+
+  /* ---------- Type ramp ---------- */
+  --text-display: 24px;
+  --text-h1: 24px;
+  --text-h2: 20px;
+  --text-h3: 18px;
+  --text-h4: 16px;
+  --text-body: 16px;
+  --text-body-sm: 14px;
+  --text-caption: 12px;
+  --text-overline: 11px;
+
+  --line-tight: 1.25;
+  --line-snug: 1.4;
+  --line-normal: 1.5;
+  --line-relaxed: 1.6;
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.145 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.145 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --border: oklch(0.269 0 0);
+  --input: oklch(0.269 0 0);
+  --ring: oklch(0.439 0 0);
+  --page-wash: oklch(0.205 0 0);
+  --sidebar-left-bg: oklch(0.205 0 0);
+  --sidebar-right-bg: oklch(0.145 0 0);
+}
+
+/* ============================================================
+   Semantic element styles — apply automatically and can be
+   overridden with utility classes.
+   ============================================================ */
+html {
+  font-size: var(--font-size);
+  font-family: var(--font-family-ui);
+  color: var(--fg-1);
+  background: var(--background);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "cv11", "ss01", "ss03";
+}
+
+body {
+  font-family: var(--font-family-ui);
+  font-size: var(--text-body);
+  font-weight: var(--font-weight-light);
+  line-height: var(--line-normal);
+  color: var(--fg-1);
+  background: var(--background);
+}
+
+h1, .h1 {
+  font-size: var(--text-h1);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-normal);
+  letter-spacing: -0.005em;
+}
+h2, .h2 {
+  font-size: var(--text-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-normal);
+}
+h3, .h3 {
+  font-size: var(--text-h3);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-normal);
+}
+h4, .h4 {
+  font-size: var(--text-h4);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-normal);
+}
+p {
+  font-size: var(--text-body);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-relaxed);
+  color: var(--fg-1);
+}
+label, .label {
+  font-size: var(--text-body);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-normal);
+  color: var(--fg-1);
+}
+button {
+  font-size: var(--text-body);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-normal);
+  font-family: var(--font-family-ui);
+}
+input, select, textarea {
+  font-size: var(--text-body);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-normal);
+  font-family: var(--font-family-ui);
+}
+
+.caption {
+  font-size: var(--text-caption);
+  color: var(--fg-3);
+  line-height: var(--line-snug);
+}
+.overline {
+  font-size: var(--text-overline);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--fg-3);
+}
+.mono, code, kbd, samp {
+  font-family: var(--font-family-mono);
+}
+.math {
+  font-family: var(--font-family-math);
+  font-style: italic;
+}
+
+/* ============================================================
+   Convenience utility classes used across previews + ui_kits.
+   ============================================================ */
+.surface-canvas { background: var(--canvas-bg); }
+.surface-page   { background: var(--page-wash); }
+.surface-sidebar-left  { background: var(--sidebar-left-bg); }
+.surface-sidebar-right { background: var(--sidebar-right-bg); }
+
+.divider-x { border-bottom: 1px solid var(--border); }
+.divider-y { border-right:  1px solid var(--border); }
+
+.card-default {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
